@@ -357,7 +357,7 @@ export default function CoachPlanner() {
         <div style={{fontWeight:900,fontSize:"20px",marginBottom:"18px"}}>設定</div>
         <div style={t.sec}>
           <div style={t.secTitle}>新增學生</div>
-          <input style={inputStyle} placeholder="學生姓名" value={newName}
+<input style={inputStyle} placeholder="學生姓名"
             onChange={e=>setNewName(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addStudent()} />
           <button style={t.btnPrimary} onClick={addStudent}>新增</button>
           <div style={{marginTop:"12px"}}>
