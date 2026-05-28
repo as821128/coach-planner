@@ -105,12 +105,8 @@ function OutputView({ results, syncing, onCopy }) {
           </div>
           <div style={t.exportBox}>{r.report}</div>
           <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-            <button style={t.btnSecondary} onClick={() => onCopy(r.report, r.name)}>
-              📋 複製
-            </button>
-            <button style={t.btnLine} onClick={() => shareToLine(r.report)}>
-              🟢 Line 傳送
-            </button>
+            <button style={t.btnSecondary} onClick={() => onCopy(r.report, r.name)}>📋 複製</button>
+            <button style={t.btnLine} onClick={() => shareToLine(r.report)}>🟢 Line 傳送</button>
           </div>
         </div>
       ))}
@@ -144,12 +140,10 @@ function PlanView({ history }) {
       return;
     }
 
-    const sessionText = recentSessions
-      .map(session => {
-        const sd = session.students.find(s => s.name === name);
-        return `【日期】${session.date}\n【紀錄】${sd?.report || ""}`;
-      })
-      .join("\n\n");
+    const sessionText = recentSessions.map(session => {
+      const sd = session.students.find(s => s.name === name);
+      return `【日期】${session.date}\n【紀錄】${sd?.report || ""}`;
+    }).join("\n\n");
 
     const prompt = `你是一位專業健身教練助理。請根據以下學生 ${name} 最近 ${recentSessions.length} 次的課程紀錄，提供下次上課的備課建議。
 
@@ -173,16 +167,15 @@ ${sessionText}
       const res = await fetch(API_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 1000,
-          messages: [{ role: "user", content: prompt }],
-        }),
+        body: JSON.stringify({ model: "gemini", max_tokens: 1000, messages: [{ role: "user", content: prompt }] }),
       });
       const d = await res.json();
-      setPlan(d.content.map(c => c.text || "").join("").trim());
+      if (d.error) throw new Error(d.error);
+      const text = d.content?.map(c => c.text || "").join("").trim();
+      if (!text) throw new Error("AI 回傳空白");
+      setPlan(text);
     } catch (e) {
-      setPlan("❌ 備課建議產生失敗，請再試一次。");
+      setPlan(`❌ 備課建議產生失敗：${e.message}`);
       console.error(e);
     }
     setPlanLoading(false);
@@ -191,9 +184,7 @@ ${sessionText}
   return (
     <div style={t.page}>
       <div style={{ fontWeight: 900, fontSize: "22px", marginBottom: "4px" }}>📚 備課建議</div>
-      <div style={{ color: C.muted, fontSize: "12px", marginBottom: "18px" }}>
-        選擇學生，AI 根據歷史紀錄產出下次上課建議
-      </div>
+      <div style={{ color: C.muted, fontSize: "12px", marginBottom: "18px" }}>選擇學生，AI 根據歷史紀錄產出下次上課建議</div>
 
       {students.length === 0 ? (
         <div style={{ color: C.muted, textAlign: "center", padding: "40px 0", fontSize: "13px" }}>
@@ -203,51 +194,31 @@ ${sessionText}
         <>
           <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginBottom: "20px" }}>
             {students.map(name => (
-              <button
-                key={name}
-                onClick={() => generatePlan(name)}
-                style={{
-                  padding: "8px 16px",
-                  background: selectedStudent === name ? C.accent : C.surface,
-                  color: selectedStudent === name ? "#0d0d0d" : C.text,
-                  border: `1px solid ${selectedStudent === name ? C.accent : C.border}`,
-                  borderRadius: "20px",
-                  fontSize: "13px",
-                  fontWeight: selectedStudent === name ? 700 : 400,
-                  cursor: "pointer",
-                }}
-              >
-                {name}
-              </button>
+              <button key={name} onClick={() => generatePlan(name)} style={{
+                padding: "8px 16px",
+                background: selectedStudent === name ? C.accent : C.surface,
+                color: selectedStudent === name ? "#0d0d0d" : C.text,
+                border: `1px solid ${selectedStudent === name ? C.accent : C.border}`,
+                borderRadius: "20px", fontSize: "13px",
+                fontWeight: selectedStudent === name ? 700 : 400, cursor: "pointer",
+              }}>{name}</button>
             ))}
           </div>
-
           {selectedStudent && (
             <div style={t.planCard}>
               <div style={{ fontWeight: 800, fontSize: "15px", marginBottom: "14px", color: C.accent }}>
                 📋 {selectedStudent} 的備課建議
               </div>
               {planLoading ? (
-                <div>
-                  {[100, 80, 90, 60, 85, 70, 95, 55, 75, 65].map((w, i) => (
-                    <div key={i} style={{ ...t.skeleton, width: `${w}%` }} />
-                  ))}
-                </div>
+                <div>{[100,80,90,60,85,70,95,55,75,65].map((w,i) => (
+                  <div key={i} style={{ ...t.skeleton, width: `${w}%` }} />
+                ))}</div>
               ) : (
                 <>
-                  <div style={{ fontSize: "13px", color: C.text, lineHeight: "1.9", whiteSpace: "pre-wrap", marginBottom: "14px" }}>
-                    {plan}
-                  </div>
+                  <div style={{ fontSize: "13px", color: C.text, lineHeight: "1.9", whiteSpace: "pre-wrap", marginBottom: "14px" }}>{plan}</div>
                   <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-                    <button style={t.btnSecondary} onClick={() => navigator.clipboard.writeText(plan)}>
-                      📋 複製備課建議
-                    </button>
-                    <button
-                      style={{ ...t.btnSecondary, borderColor: C.accent, color: C.accent }}
-                      onClick={() => generatePlan(selectedStudent)}
-                    >
-                      🔄 重新產生
-                    </button>
+                    <button style={t.btnSecondary} onClick={() => navigator.clipboard.writeText(plan)}>📋 複製備課建議</button>
+                    <button style={{ ...t.btnSecondary, borderColor: C.accent, color: C.accent }} onClick={() => generatePlan(selectedStudent)}>🔄 重新產生</button>
                   </div>
                 </>
               )}
@@ -269,24 +240,12 @@ function HistoryView({ history, onImport, importing }) {
           <div style={{ fontWeight: 900, fontSize: "22px", marginBottom: "4px" }}>📅 歷史紀錄</div>
           <div style={{ color: C.muted, fontSize: "12px" }}>所有課程紀錄</div>
         </div>
-        <button
-          onClick={onImport}
-          disabled={importing}
-          style={{
-            background: "transparent",
-            color: importing ? C.muted : C.accent,
-            border: `1px solid ${importing ? C.border : C.accent}`,
-            borderRadius: "9px",
-            padding: "7px 12px",
-            fontSize: "12px",
-            fontWeight: 600,
-            cursor: importing ? "not-allowed" : "pointer",
-            whiteSpace: "nowrap",
-            flexShrink: 0,
-          }}
-        >
-          {importing ? "⏳ 匯入中..." : "☁️ 從 Sheet 匯入"}
-        </button>
+        <button onClick={onImport} disabled={importing} style={{
+          background: "transparent", color: importing ? C.muted : C.accent,
+          border: `1px solid ${importing ? C.border : C.accent}`,
+          borderRadius: "9px", padding: "7px 12px", fontSize: "12px",
+          fontWeight: 600, cursor: importing ? "not-allowed" : "pointer", whiteSpace: "nowrap", flexShrink: 0,
+        }}>{importing ? "⏳ 匯入中..." : "☁️ 從 Sheet 匯入"}</button>
       </div>
 
       {history.length === 0 ? (
@@ -296,15 +255,11 @@ function HistoryView({ history, onImport, importing }) {
       ) : (
         [...history].reverse().map((session, i) => (
           <div key={i} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "12px", padding: "13px 15px", marginBottom: "8px" }}>
-            <div
-              style={{ display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer" }}
-              onClick={() => setExpanded(expanded === i ? null : i)}
-            >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer" }}
+              onClick={() => setExpanded(expanded === i ? null : i)}>
               <div>
                 <div style={{ fontWeight: 800, color: C.accent, fontSize: "14px" }}>📅 {session.date}</div>
-                <div style={{ fontSize: "12px", color: C.muted, marginTop: "3px" }}>
-                  {session.students.map(s => s.name).join("、")}
-                </div>
+                <div style={{ fontSize: "12px", color: C.muted, marginTop: "3px" }}>{session.students.map(s => s.name).join("、")}</div>
               </div>
               <div style={{ color: C.muted, fontSize: "16px" }}>{expanded === i ? "▲" : "▼"}</div>
             </div>
@@ -338,7 +293,7 @@ export default function CoachPlanner() {
 
   const showToast = useCallback((msg) => {
     setToast(msg);
-    setTimeout(() => setToast(""), 2500);
+    setTimeout(() => setToast(""), 3000);
   }, []);
 
   const setNotesCallback = useCallback(v => setNotes(v), []);
@@ -368,14 +323,12 @@ ${notes}
       const res = await fetch(API_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 2000,
-          messages: [{ role: "user", content: prompt }],
-        }),
+        body: JSON.stringify({ model: "gemini", max_tokens: 2000, messages: [{ role: "user", content: prompt }] }),
       });
       const d = await res.json();
-      const raw = d.content.map(c => c.text || "").join("").replace(/```json|```/g, "").trim();
+      if (d.error) throw new Error(d.error);
+      const raw = d.content?.map(c => c.text || "").join("").replace(/```json|```/g, "").trim();
+      if (!raw) throw new Error("AI 回傳空白");
       const parsed = JSON.parse(raw);
 
       setResults(parsed);
@@ -401,7 +354,7 @@ ${notes}
       }
       setSyncing(false);
     } catch (e) {
-      showToast("❌ 產生失敗，請再試一次");
+      showToast(`❌ ${e.message}`);
       console.error(e);
     }
     setLoading(false);
@@ -432,10 +385,7 @@ ${notes}
       });
 
       const importedSessions = Object.entries(sessionMap)
-        .map(([date, students]) => ({
-          date,
-          students: Object.entries(students).map(([name, report]) => ({ name, report })),
-        }))
+        .map(([date, students]) => ({ date, students: Object.entries(students).map(([name, report]) => ({ name, report })) }))
         .sort((a, b) => a.date.localeCompare(b.date));
 
       if (importedSessions.length === 0) { showToast("⚠️ 沒有找到可匯入的資料"); setImporting(false); return; }
