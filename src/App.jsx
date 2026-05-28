@@ -1,5 +1,3 @@
-$ cat /home/user/coach-planner/src/App.jsx
-
 import { useState, useEffect, useCallback } from "react";
 
 const GAS_URL = "https://script.google.com/macros/s/AKfycbw_gQ8-SSjJbD6ymG2Th7KG_ru0y9uQNOv9Lz4MmqbyblUIQ9bCWSiD1mRCJcRqTvvG6Q/exec";
@@ -68,10 +66,6 @@ const t = {
   toast:    { position:"fixed", bottom:"82px", left:"50%", transform:"translateX(-50%)", background:C.accent, color:"#0d0d0d", padding:"9px 20px", borderRadius:"30px", fontSize:"13px", fontWeight:800, zIndex:999, whiteSpace:"nowrap", boxShadow:`0 4px 20px ${C.accent}44` },
   planRow:  { background:C.surface, border:`1px solid ${C.border}`, borderRadius:"11px", padding:"11px 12px", marginBottom:"7px" },
 };
-
-// All view components are defined OUTSIDE CoachPlanner so their identity is stable across re-renders.
-// Defining components inside a parent function causes React to treat them as new types on every render,
-// which unmounts and remounts them — causing inputs to lose focus after each keystroke.
 
 function ExRow({ ex, updEx, moveEx, delEx }) {
   return (
