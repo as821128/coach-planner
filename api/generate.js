@@ -10,11 +10,11 @@ export default async function handler(req, res) {
 
   try {
     const { messages, max_tokens } = req.body;
-    const prompt = messages.map(m =>
-      typeof m.content === "string" ? m.content : m.content.map(c => c.text || "").join("")
-    ).join("\n");
+    const prompt = messages
+      .map(m => typeof m.content === "string" ? m.content : m.content.map(c => c.text || "").join(""))
+      .join("\n");
 
-    const response = await fetch(
+    const geminiRes = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
       {
         method: "POST",
@@ -26,10 +26,18 @@ export default async function handler(req, res) {
       }
     );
 
-    const data = await response.json();
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    const data = await geminiRes.json();
 
-    // Return in Anthropic-compatible format so App.jsx doesn't need changes
+    if (data.error) {
+      return res.status(500).json({ error: `Gemini: ${data.error.message}` });
+    }
+
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    if (!text) {
+      const reason = data.candidates?.[0]?.finishReason || "unknown";
+      return res.status(500).json({ error: `Gemini 回傳空白 (reason: ${reason})` });
+    }
+
     res.json({ content: [{ type: "text", text }] });
   } catch (err) {
     res.status(500).json({ error: err.message });
