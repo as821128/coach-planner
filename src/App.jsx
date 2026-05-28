@@ -1,8 +1,8 @@
 import { useState, useCallback, useMemo } from "react";
 
 const GAS_URL = "https://script.google.com/macros/s/AKfycbw_gQ8-SSjJbD6ymG2Th7KG_ru0y9uQNOv9Lz4MmqbyblUIQ9bCWSiD1mRCJcRqTvvG6Q/exec";
+const API_URL = "/api/generate";
 const STORAGE_KEY = "coach_planner_v4";
-const API_URL = "https://api.anthropic.com/v1/messages";
 
 const C = {
   bg: "#0d0d0d", surface: "#161616", border: "#242424",
@@ -273,7 +273,7 @@ function HistoryView({ history, onImport, importing }) {
           onClick={onImport}
           disabled={importing}
           style={{
-            background: importing ? C.surface : "transparent",
+            background: "transparent",
             color: importing ? C.muted : C.accent,
             border: `1px solid ${importing ? C.border : C.accent}`,
             borderRadius: "9px",
@@ -419,7 +419,6 @@ ${notes}
       const rows = d.rows || [];
       if (rows.length === 0) { showToast("⚠️ Sheet 沒有資料可匯入"); setImporting(false); return; }
 
-      // Group rows by date; col[0]=date, col[1]=name, remaining=report text
       const sessionMap = {};
       rows.forEach(row => {
         if (!row || row.length < 2) return;
