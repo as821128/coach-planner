@@ -259,17 +259,39 @@ ${sessionText}
   );
 }
 
-function HistoryView({ history }) {
+function HistoryView({ history, onImport, importing }) {
   const [expanded, setExpanded] = useState(null);
 
   return (
     <div style={t.page}>
-      <div style={{ fontWeight: 900, fontSize: "22px", marginBottom: "4px" }}>📅 歷史紀錄</div>
-      <div style={{ color: C.muted, fontSize: "12px", marginBottom: "18px" }}>所有課程紀錄</div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "18px" }}>
+        <div>
+          <div style={{ fontWeight: 900, fontSize: "22px", marginBottom: "4px" }}>📅 歷史紀錄</div>
+          <div style={{ color: C.muted, fontSize: "12px" }}>所有課程紀錄</div>
+        </div>
+        <button
+          onClick={onImport}
+          disabled={importing}
+          style={{
+            background: importing ? C.surface : "transparent",
+            color: importing ? C.muted : C.accent,
+            border: `1px solid ${importing ? C.border : C.accent}`,
+            borderRadius: "9px",
+            padding: "7px 12px",
+            fontSize: "12px",
+            fontWeight: 600,
+            cursor: importing ? "not-allowed" : "pointer",
+            whiteSpace: "nowrap",
+            flexShrink: 0,
+          }}
+        >
+          {importing ? "⏳ 匯入中..." : "☁️ 從 Sheet 匯入"}
+        </button>
+      </div>
 
       {history.length === 0 ? (
         <div style={{ color: C.muted, textAlign: "center", padding: "40px 0", fontSize: "13px" }}>
-          尚無紀錄，請先使用輸入頁面記錄課程
+          尚無紀錄，請先使用輸入頁面記錄課程，或點右上角從 Sheet 匯入
         </div>
       ) : (
         [...history].reverse().map((session, i) => (
@@ -304,14 +326,15 @@ function HistoryView({ history }) {
 }
 
 export default function CoachPlanner() {
-  const [tab, setTab]       = useState("input");
-  const [date, setDate]     = useState(todayISOStr);
-  const [notes, setNotes]   = useState("");
+  const [tab, setTab]         = useState("input");
+  const [date, setDate]       = useState(todayISOStr);
+  const [notes, setNotes]     = useState("");
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [results, setResults] = useState([]);
   const [history, setHistory] = useState(loadHistory);
-  const [toast, setToast]   = useState("");
+  const [toast, setToast]     = useState("");
 
   const showToast = useCallback((msg) => {
     setToast(msg);
@@ -388,6 +411,52 @@ ${notes}
     navigator.clipboard.writeText(text).then(() => showToast(`✅ ${name} 的報告已複製！`));
   }, [showToast]);
 
+  const importFromSheet = useCallback(async () => {
+    setImporting(true);
+    try {
+      const res = await fetch(GAS_URL);
+      const d = await res.json();
+      const rows = d.rows || [];
+      if (rows.length === 0) { showToast("⚠️ Sheet 沒有資料可匯入"); setImporting(false); return; }
+
+      // Group rows by date; col[0]=date, col[1]=name, remaining=report text
+      const sessionMap = {};
+      rows.forEach(row => {
+        if (!row || row.length < 2) return;
+        const rawDate = String(row[0] ?? "").trim();
+        const name    = String(row[1] ?? "").trim();
+        if (!rawDate || !name || rawDate === "日期" || rawDate === "Date") return;
+        const date = rawDate.replace(/-/g, "/");
+        const report = row.slice(2).map(v => String(v ?? "").trim()).filter(Boolean).join("　") || "（匯入自 Google Sheet）";
+        if (!sessionMap[date]) sessionMap[date] = {};
+        if (!sessionMap[date][name]) sessionMap[date][name] = report;
+      });
+
+      const importedSessions = Object.entries(sessionMap)
+        .map(([date, students]) => ({
+          date,
+          students: Object.entries(students).map(([name, report]) => ({ name, report })),
+        }))
+        .sort((a, b) => a.date.localeCompare(b.date));
+
+      if (importedSessions.length === 0) { showToast("⚠️ 沒有找到可匯入的資料"); setImporting(false); return; }
+
+      setHistory(prev => {
+        const existing = new Set(prev.flatMap(s => s.students.map(st => `${s.date}|${st.name}`)));
+        const newOnes  = importedSessions.filter(s => s.students.some(st => !existing.has(`${s.date}|${st.name}`)));
+        if (newOnes.length === 0) { showToast("✅ 資料已是最新，無需匯入"); return prev; }
+        const merged = [...prev, ...newOnes].sort((a, b) => a.date.localeCompare(b.date));
+        saveHistory(merged);
+        showToast(`✅ 成功匯入 ${newOnes.length} 筆課程！`);
+        return merged;
+      });
+    } catch (e) {
+      showToast("❌ 匯入失敗，請確認 GAS 腳本已更新並重新部署");
+      console.error(e);
+    }
+    setImporting(false);
+  }, [showToast]);
+
   const navItems = [
     { id: "input",   icon: "✏️",  label: "輸入" },
     { id: "output",  icon: "📋",  label: "今日紀錄" },
@@ -411,7 +480,7 @@ ${notes}
         {tab === "input"   && <InputView date={date} setDate={setDateCallback} notes={notes} setNotes={setNotesCallback} loading={loading} onGenerate={generate} />}
         {tab === "output"  && <OutputView results={results} syncing={syncing} onCopy={handleCopy} />}
         {tab === "plan"    && <PlanView history={history} />}
-        {tab === "history" && <HistoryView history={history} />}
+        {tab === "history" && <HistoryView history={history} onImport={importFromSheet} importing={importing} />}
 
         {toast && <div style={t.toast}>{toast}</div>}
 
